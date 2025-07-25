@@ -1,0 +1,11 @@
+{
+  "recommendations": [
+    "rust-lang.rust-analyzer",
+    "vadimcn.vscode-lldb",
+    "tamasfe.even-better-toml",
+    "ryanluker.vscode-coverage-gutters",
+    "iulian-radu-at.vscode-tasks-sidebar",
+    "zxh404.vscode-proto3",
+    "fill-labs.dependi",
+  ]
+}

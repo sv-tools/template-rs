@@ -1,0 +1,25 @@
+[package]
+name = "project"
+version = "0.1.0"
+description = "A collection of handy utility functions for Rust projects."
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+homepage.workspace = true
+repository.workspace = true
+readme.workspace = true
+keywords.workspace = true
+categories.workspace = true
+publish = false
+include = [
+  "src",
+  "Cargo.toml",
+  "../../README.md",
+  "../../LICENSE-APACHE",
+  "../../LICENSE-MIT",
+]
+
+[badges]
+maintenance = { status = "actively-developed" }
+
+[dependencies]

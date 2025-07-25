@@ -1,0 +1,10 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="All Checks" type="CompoundRunConfigurationType">
+    <toRun name="All Tests" targetId="RsBuildProfile:dev" type="CargoCommandRunConfiguration" />
+    <toRun name="Clippy" type="CargoCommandRunConfiguration" />
+    <toRun name="Deny" type="CargoCommandRunConfiguration" />
+    <toRun name="Format" type="CargoCommandRunConfiguration" />
+    <toRun name="Machete" type="CargoCommandRunConfiguration" />
+    <method v="2" />
+  </configuration>
+</component>
