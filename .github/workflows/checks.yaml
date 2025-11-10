@@ -112,7 +112,7 @@ jobs:
         run: cargo publish --all-features --package ${{ matrix.crate }} --dry-run --verbose
       - name: Create package
         run: cargo package --all-features --package ${{ matrix.crate }} --verbose
-      - uses: actions/upload-artifact@v4.6.2 # immutable action, safe to use the versions
+      - uses: actions/upload-artifact@v5.0.0 # immutable action, safe to use the versions
         with:
           name: ${{ matrix.crate }}-crate
           path: target/package/${{ matrix.crate }}-*.crate
