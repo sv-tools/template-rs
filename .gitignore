@@ -27,3 +27,6 @@ target
 
 # Cargo.lock is not needed for libraries, but is required for binaries
 #Cargo.lock
+
+# Claude Code
+.claude/
