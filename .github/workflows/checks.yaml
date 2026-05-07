@@ -9,6 +9,9 @@ on:
     secrets:
       CODECOV_TOKEN:
         required: true
+    outputs:
+      publish:
+        value: ${{ jobs.RustMeta.outputs.publish }}
   schedule:
     - cron: "0 0 * * 0"
 
@@ -18,15 +21,27 @@ env:
 permissions: read-all
 
 jobs:
+  RustMeta:
+    name: Collect crate metadata
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.rustmeta.outputs.matrix }}
+      publish: ${{ steps.rustmeta.outputs.publish }}
+    steps:
+      - uses: actions/checkout@v6.0.2 # immutable action, safe to use the versions
+      - uses: sv-tools/rust-metadata-action@f3e4c81b5d58bb5920965e9441181788608c6c5c # v1.0.0
+        id: rustmeta
   BuildJob:
     name: Build per OS
+    needs: RustMeta
     strategy:
         matrix:
             os: [ "ubuntu-latest", "windows-latest", "macos-latest" ]
+            args: ${{ fromJSON(needs.RustMeta.outputs.matrix) }}
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v6.0.2 # immutable action, safe to use the versions
-      - run: cargo build --all-features --all-targets --verbose
+      - run: cargo build ${{ matrix.args }} --all-targets --verbose
   Build:
     name: Wait for build jobs to finish
     needs: BuildJob
@@ -54,9 +69,11 @@ jobs:
         if: failure()
   TestJob:
     name: Test per OS
+    needs: RustMeta
     strategy:
       matrix:
         os: [ "ubuntu-latest", "windows-latest", "macos-latest" ]
+        args: ${{ fromJSON(needs.RustMeta.outputs.matrix) }}
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v6.0.2 # immutable action, safe to use the versions
@@ -66,7 +83,7 @@ jobs:
           cache-all-crates: true
       - run: cargo install-tools
       - name: Run tests
-        run: cargo llvm-cov nextest --all-features --all-targets --no-fail-fast --no-tests=pass --verbose
+        run: cargo llvm-cov nextest ${{ matrix.args }} --all-targets --no-fail-fast --no-tests=pass --verbose
       - name: Prepare coverage report
         if: ${{ !cancelled() }}
         run: cargo llvm-cov report --lcov --output-path coverage.lcov
@@ -104,26 +121,32 @@ jobs:
         run: cargo deny check all
   PublishCrateJob:
     name: Test publishing per crate
+    needs: RustMeta
     strategy:
       matrix:
-        crate: [ "project" ]
+        package: ${{ fromJSON(needs.RustMeta.outputs.publish) }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6.0.2 # immutable action, safe to use the versions
       - name: Dry run publish
-        run: cargo publish --all-features --package ${{ matrix.crate }} --dry-run --verbose
+        run: cargo publish --all-features --package ${{ matrix.package }} --dry-run --verbose
       - name: Create package
-        run: cargo package --all-features --package ${{ matrix.crate }} --verbose
+        run: cargo package --all-features --package ${{ matrix.package }} --verbose
       - uses: actions/upload-artifact@v7.0.1 # immutable action, safe to use the versions
         with:
-          name: ${{ matrix.crate }}-crate
-          path: target/package/${{ matrix.crate }}-*.crate
+          name: ${{ matrix.package }}-crate
+          path: target/package/${{ matrix.package }}-*.crate
   Publish:
     name: Wait for publishing jobs to finish
-    needs: PublishCrateJob
+    needs:
+      - RustMeta
+      - PublishCrateJob
+    if: ${{ always() }}
     runs-on: ubuntu-latest
     steps:
-      - run: echo "Publishing Passed"
+      - name: Check status
+        if: ${{ needs.RustMeta.outputs.publish != '[]' && (needs.PublishCrateJob.result == 'failure' || needs.PublishCrateJob.result == 'cancelled') }}
+        run: exit 1
   AllChecks:
     name: All checks
     needs:
