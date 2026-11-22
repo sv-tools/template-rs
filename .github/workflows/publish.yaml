@@ -1,8 +1,18 @@
 name: Publish
 
+# Publishes a crate to crates.io when its draft GitHub Release (created by
+# `release-stage.yaml`) is published. `workflow_dispatch` re-runs a tag
+# without re-tagging, e.g. after a crates.io outage.
+
 on:
-  push:
-    tags: [ "**/v[0-9]+.[0-9]+.[0-9]+" ]
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to (re)publish (e.g. project/v0.1.0)"
+        required: true
+        type: string
 
 env:
   CARGO_TERM_COLOR: always
@@ -10,24 +20,43 @@ env:
 permissions: read-all
 
 jobs:
-  Checks:
-    uses: ./.github/workflows/checks.yaml
-    secrets:
-      CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+  Resolve:
+    name: Resolve the release tag
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.tag.outputs.tag }}
+      package: ${{ steps.meta.outputs.tag-package }}
+      version: ${{ steps.meta.outputs.tag-version }}
+    steps:
+      - id: tag
+        env:
+          TAG: ${{ github.event.release.tag_name || inputs.tag }}
+        run: echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ steps.tag.outputs.tag }}
+      # Fails unless the tag names a crate at its Cargo.toml version.
+      - uses: sv-tools/rust-metadata-action@4020eda3b8b92b4cc9835dfe8d792ec2ace4690e # v1.3.1
+        id: meta
+        with:
+          tag: ${{ steps.tag.outputs.tag }}
+
   Publish:
-    needs: Checks
-    strategy:
-      matrix:
-        package: ${{ fromJSON(needs.Checks.outputs.publish) }}
-      fail-fast: false
+    name: Publish to crates.io
+    needs: Resolve
     runs-on: ubuntu-latest
     permissions:
-      id-token: write
+      contents: read
+      id-token: write # trusted publishing exchanges the OIDC token for a crates.io token
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.Resolve.outputs.tag }}
       - uses: actions-rust-lang/setup-rust-toolchain@a188e68d0fd2bd36ad51dccb2b07ba6e75105f30 # v2.0.1
       - uses: rust-lang/crates-io-auth-action@3268eb413133e2960fa4ae0e963ca76380c54cd9 # v1.0.6
         id: auth
-      - run: cargo publish --all-features --package ${{ matrix.package }} --verbose
+      # One crate per tag, resolving siblings from crates.io, so tags must be
+      # released in dependency order.
+      - run: cargo publish --all-features --package ${{ needs.Resolve.outputs.package }} --verbose
         env:
           CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
